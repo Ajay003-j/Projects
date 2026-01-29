@@ -1,6 +1,6 @@
-import requests
 import time
 import os
+import requests
 
 def get_proxies():
     while True:
