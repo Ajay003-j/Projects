@@ -29,10 +29,12 @@ def get_input_forms(URL):
             soup = BeautifulSoup(response.content,"html.parser")
             forms = soup.find_all("form")
             for form in forms:
+                #getting the method,action and input types from the html code
                 method = form.get("method", "get").lower()
                 action = urljoin(Url, form.get("action", Url))
                 inputs = [inp for inp in form.find_all("input")]
                 packing.append((Url, method, action, inputs))
+                #using tuple packing to append it in a file
         except Exception as e:
             print(e)
     return packing

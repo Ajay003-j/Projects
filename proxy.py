@@ -33,10 +33,13 @@ def get_proxies():
 
         with open("proxy.txt", "r") as p:
             exists = p.read().splitlines()
-
+        #Ensure the proxy dose not already exits and write it in a file
         if proxy in exists:
-            print()
+            continue
         else:
-            with open("proxy.txt", "a") as f:
-                f.write(proxy + "\n")
-            print()
+            try:
+                with open("proxy.txt", "a") as f:
+                    f.write(proxy + "\n")
+            except Exception as e:
+                print(e)
+            
