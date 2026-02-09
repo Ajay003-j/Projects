@@ -57,5 +57,4 @@ def get_input_forms(URL):
             print(f"Error fetching {Url}: {e}")
 
     driver.quit()
-    print(results)
-get_input_forms("https://skillzeninstitute.com/")
+    return results
