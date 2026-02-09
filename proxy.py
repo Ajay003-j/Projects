@@ -38,6 +38,6 @@ def get_proxies():
             try:
                 with open("proxy.txt", "a") as f:
                     f.write(proxy + "\n")
-            except Exception as e:
+            except requests.RequestException as e:
                 print(e)
             
