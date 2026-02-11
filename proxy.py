@@ -40,4 +40,4 @@ def get_proxies():
                     f.write(proxy + "\n")
             except requests.RequestException as e:
                 print(e)
-            
+get_proxies()
