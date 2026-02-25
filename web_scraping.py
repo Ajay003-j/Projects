@@ -65,38 +65,41 @@ def fetch_page(url: str, driver=None, use_selenium_first: bool = True):
     return None
 
 def get_urls(start_url: str, max_pages: int = 100, max_depth: int = 3, max_time: int = 600) -> List[str]:
-    visited = set()
-    queue = deque([(start_url, 0)])
-    start_time = time.time()
-    BAD_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".svg", ".ico", ".css", ".js", ".pdf", ".zip", ".rar")
-    driver = create_driver() if SELENIUM_AVAILABLE else None
-    while queue and len(visited) < max_pages:
-        if time.time() - start_time > max_time:
-            print("⏰ Crawl time limit reached, stopping.")
-            break
-        current_url, depth = queue.popleft()
-        current_url = normalize_url(current_url)
-        if current_url in visited or depth > max_depth:
-            continue
-        soup = fetch_page(current_url, driver, use_selenium_first=True)
-        if not soup:
-            continue
-        visited.add(current_url)
-        print(f"{OKGREEN}[+]{ENDC}{OKBLUE}{BOLD}Crawling: {current_url}" + ENDC)
-        for link in soup.find_all("a", href=True):
-            full_url = urljoin(current_url, link["href"])
-            full_url = normalize_url(full_url)
-            if full_url.lower().endswith(BAD_EXTENSIONS):
+    try:
+        visited = set()
+        queue = deque([(start_url, 0)])
+        start_time = time.time()
+        BAD_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".svg", ".ico", ".css", ".js", ".pdf", ".zip", ".rar")
+        driver = create_driver() if SELENIUM_AVAILABLE else None
+        while queue and len(visited) < max_pages:
+            if time.time() - start_time > max_time:
+                print("⏰ Crawl time limit reached, stopping.")
+                break
+            current_url, depth = queue.popleft()
+            current_url = normalize_url(current_url)
+            if current_url in visited or depth > max_depth:
                 continue
-            parsed = urlparse(full_url)
-            if same_domain(start_url, full_url) and parsed.scheme in ["http", "https"] and full_url not in visited and depth + 1 <= max_depth:
-                queue.append((full_url, depth + 1))
-        if len(visited) >= max_pages:
-            break
-        time.sleep(random.uniform(0.3, 1))
-    if driver:
-        driver.quit()
-    return list(visited)
+            soup = fetch_page(current_url, driver, use_selenium_first=True)
+            if not soup:
+                continue
+            visited.add(current_url)
+            print(f"{OKGREEN}[+]{ENDC}{OKBLUE}{BOLD}Crawling: {current_url}" + ENDC)
+            for link in soup.find_all("a", href=True):
+                full_url = urljoin(current_url, link["href"])
+                full_url = normalize_url(full_url)
+                if full_url.lower().endswith(BAD_EXTENSIONS):
+                    continue
+                parsed = urlparse(full_url)
+                if same_domain(start_url, full_url) and parsed.scheme in ["http", "https"] and full_url not in visited and depth + 1 <= max_depth:
+                    queue.append((full_url, depth + 1))
+            if len(visited) >= max_pages:
+                break
+            time.sleep(random.uniform(0.3, 1))
+        if driver:
+            driver.quit()
+        return list(visited)
+    except KeyboardInterrupt:
+        sys.exit(0)
 
 # -------------------------
 # ENHANCED Form Detection
@@ -137,43 +140,46 @@ def detect_form_type(soup, form, page_url) -> str:
     return max(form_score, key=form_score.get)
 
 def get_input_forms(URL: str) -> List[Dict[str, Any]]:
-    print(OKBLUE + BOLD + f"🐝 Spidering {URL}..." + ENDC)
-    print(OKGREEN+">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"+ENDC)
-    urls = get_urls(URL,max_pages=30)
-    print(OKBLUE + f"📄 Found {len(urls)} pages to scan" + ENDC)
-    results = []
-    driver = create_driver() if SELENIUM_AVAILABLE else None
-    for page_url in urls:
-        soup = fetch_page(page_url, driver, use_selenium_first=True)
-        if not soup:
-            continue
-        forms = soup.find_all("form")
-        for form in forms:
-            method = form.get("method", "GET").upper()
-            action = form.get("action")
-            if action:
-                endpoint = urljoin(page_url, action)
-            else:
-                endpoint = page_url
-            endpoint = normalize_url(endpoint)
-            
-            # ENHANCED DETECTION
-            form_type = detect_form_type(soup, form, page_url)
-            inputs = []
-            for inp in form.find_all(['input', 'textarea', 'select']):
-                name = inp.get('name', '') or inp.get('id', '')
-                typ = inp.get('type', 'text')
-                placeholder = inp.get('placeholder', '')
-                inputs.append({'name': name, 'type': typ, 'placeholder': placeholder})
-            
-            results.append({
-                "endpoint": endpoint,
-                "method": method,
-                "action": endpoint,
-                "form_type": form_type,
-                "inputs": inputs
-            })
-    if driver:
-        driver.quit()
-    print(OKBLUE + BOLD + f"✅ Found {len(results)} smart attack surfaces!" + ENDC)
-    return results
+    try:
+        print(OKBLUE + BOLD + f"🐝 Spidering {URL}..." + ENDC)
+        print(OKGREEN+">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"+ENDC)
+        urls = get_urls(URL,max_pages=30)
+        print(OKBLUE + f"📄 Found {len(urls)} pages to scan" + ENDC)
+        results = []
+        driver = create_driver() if SELENIUM_AVAILABLE else None
+        for page_url in urls:
+            soup = fetch_page(page_url, driver, use_selenium_first=True)
+            if not soup:
+                continue
+            forms = soup.find_all("form")
+            for form in forms:
+                method = form.get("method", "GET").upper()
+                action = form.get("action")
+                if action:
+                    endpoint = urljoin(page_url, action)
+                else:
+                    endpoint = page_url
+                endpoint = normalize_url(endpoint)
+                
+                # ENHANCED DETECTION
+                form_type = detect_form_type(soup, form, page_url)
+                inputs = []
+                for inp in form.find_all(['input', 'textarea', 'select']):
+                    name = inp.get('name', '') or inp.get('id', '')
+                    typ = inp.get('type', 'text')
+                    placeholder = inp.get('placeholder', '')
+                    inputs.append({'name': name, 'type': typ, 'placeholder': placeholder})
+                
+                results.append({
+                    "endpoint": endpoint,
+                    "method": method,
+                    "action": endpoint,
+                    "form_type": form_type,
+                    "inputs": inputs
+                })
+        if driver:
+            driver.quit()
+        print(OKBLUE + BOLD + f"✅ Found {len(results)} smart attack surfaces!" + ENDC)
+        return results
+    except KeyboardInterrupt:
+        sys.exit(0)
