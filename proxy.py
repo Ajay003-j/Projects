@@ -44,9 +44,8 @@ def get_proxies(max_proxies: int = 10, output_file: str = "proxy.txt") -> list:
                 collected.append(proxy_str)
                 with open(output_file, "a") as f:
                     f.write(proxy_str + "\n")
-                print(f"[proxy] ✅ Saved: {proxy_str}")
             else:
-                print(f"[proxy] ❌ Dead proxy skipped: {proxy_str}")
+                continue
 
         except (requests.RequestException, KeyError, IndexError, ValueError) as e:
             print(f"[proxy] Error: {e}")
