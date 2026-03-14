@@ -19,6 +19,8 @@ from collections import deque
 from urllib.parse import urljoin, urlparse, parse_qs, urlencode, urlunparse
 
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 from bs4 import BeautifulSoup
 from urllib.robotparser import RobotFileParser
 
@@ -48,9 +50,23 @@ try:
     from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.chrome.service import Service
     from selenium.common.exceptions import WebDriverException, TimeoutException
+
+    # Probe — actually try to launch Chrome right now at import time.
+    # If Chrome binary is missing or crashes, we know immediately and
+    # fall back to requests-only. No wasted time during crawling.
+    _probe_opts = Options()
+    _probe_opts.add_argument("--headless=new")
+    _probe_opts.add_argument("--no-sandbox")
+    _probe_opts.add_argument("--disable-dev-shm-usage")
+    _probe_opts.add_argument("--disable-gpu")
+    _probe_driver = webdriver.Chrome(options=_probe_opts)
+    _probe_driver.quit()
+    del _probe_driver, _probe_opts
     SELENIUM_AVAILABLE = True
-except ImportError:
-    pass
+    log.info("Chrome driver available — JS rendering enabled")
+except Exception:
+    SELENIUM_AVAILABLE = False
+    log.info("Chrome unavailable — using requests only (JS rendering disabled)")
 
 BAD_EXTENSIONS = (
     ".jpg", ".jpeg", ".png", ".gif", ".svg", ".ico",
@@ -105,14 +121,18 @@ def load_robots(base_url: str, respect_robots: bool = True) -> Optional[RobotFil
     if not respect_robots:
         return None
     try:
-        rp = RobotFileParser()
         robots_url = f"{urlparse(base_url).scheme}://{urlparse(base_url).netloc}/robots.txt"
-        rp.set_url(robots_url)
-        rp.read()
-        log.info(f"robots.txt loaded from {robots_url}")
-        return rp
+        # Hard 5s timeout — never block the crawl waiting for robots.txt
+        resp = requests.get(robots_url, timeout=5, headers=HEADERS)
+        if resp.status_code == 200:
+            rp = RobotFileParser()
+            rp.set_url(robots_url)
+            rp.parse(resp.text.splitlines())
+            log.info(f"robots.txt loaded from {robots_url}")
+            return rp
+        return None
     except Exception as e:
-        log.warning(f"Could not load robots.txt: {e}")
+        log.debug(f"Could not load robots.txt: {e}")
         return None
 
 def robots_allowed(rp: Optional[RobotFileParser], url: str) -> bool:
@@ -125,6 +145,7 @@ def robots_allowed(rp: Optional[RobotFileParser], url: str) -> bool:
 # ─────────────────────────────────────────────
 
 def create_driver() -> Optional[object]:
+    """Create Chrome driver. Returns None immediately if Chrome unavailable."""
     if not SELENIUM_AVAILABLE:
         return None
     options = Options()
@@ -139,17 +160,12 @@ def create_driver() -> Optional[object]:
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
-    try:
-        driver = webdriver.Chrome(options=options)
-        driver.set_page_load_timeout(15)
-        driver.execute_script(
-            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-        )
-        log.info(f"{OKGREEN}Chrome driver ready{ENDC}")
-        return driver
-    except Exception:
-        log.warning("Selenium unavailable, using requests only")
-        return None
+    driver = webdriver.Chrome(options=options)
+    driver.set_page_load_timeout(15)
+    driver.execute_script(
+        "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+    )
+    return driver
 
 # ─────────────────────────────────────────────
 # Page Fetching
@@ -187,7 +203,8 @@ def fetch_page(
             log.debug(f"Selenium error on {url}: {e}")
 
     try:
-        resp = session.get(url, timeout=timeout, headers=HEADERS, allow_redirects=True)
+        resp = session.get(url, timeout=timeout, headers=HEADERS,
+                           allow_redirects=True, verify=False)
         resp.raise_for_status()
         return BeautifulSoup(resp.text, "html.parser")
     except requests.exceptions.HTTPError as e:
@@ -243,13 +260,83 @@ def get_urls(
     - Proper error logging
     """
     try:
-        session     = requests.Session()
-        driver      = create_driver() if SELENIUM_AVAILABLE else None
+        session = requests.Session()
+        # Crawler uses DIRECT connection — NOT through proxies.
+        # Proxies are only for attack requests in bees.py.
+        # trust_env=False stops requests from picking up system
+        # http_proxy / https_proxy environment variables.
+        session.trust_env = False
+        # Retry up to 3 times on connection errors — handles flaky servers
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
+        retry = Retry(
+            total=2,
+            backoff_factor=0.3,
+            status_forcelist=[500, 502, 503, 504],
+            # Do NOT retry on connection errors — if DNS fails once
+            # it will fail again. Retrying just wastes time and
+            # produces confusing log spam.
+            raise_on_status=False,
+        )
+        session.mount("http://",  HTTPAdapter(max_retries=retry))
+        session.mount("https://", HTTPAdapter(max_retries=retry))
+        session.headers.update(HEADERS)
+
+        driver      = create_driver()   # returns None instantly if Chrome unavailable
         rp          = load_robots(start_url, respect_robots)
         visited_fps : Set[str] = set()   # fingerprints (param-normalized)
         visited_urls: Set[str] = set()   # actual URLs for output
         queue       = deque([(normalize_url(start_url), 0)])
         start_time  = time.time()
+
+        # ── Pre-flight check — fail fast, clear error message ────
+        # Test DNS + TCP before starting the crawl.
+        # Catches: DNS broken, site down, network unreachable.
+        # Without this, the retry middleware swallows the error
+        # and returns 0 pages with no explanation.
+        parsed_start = urlparse(start_url)
+        host = parsed_start.hostname
+        port = parsed_start.port or (443 if parsed_start.scheme == "https" else 80)
+        try:
+            import socket
+            socket.setdefaulttimeout(5)
+            socket.getaddrinfo(host, port)
+        except socket.gaierror:
+            log.error(
+                f"\n{'='*60}\n"
+                f"  DNS FAILED: cannot resolve '{host}'\n"
+                f"  Fix: sudo rm /etc/resolv.conf && "
+                f"echo 'nameserver 8.8.8.8' | sudo tee /etc/resolv.conf\n"
+                f"{'='*60}"
+            )
+            return []
+        except OSError as e:
+            log.error(f"Network error before crawl: {e}")
+            return []
+
+        # ── Quick HTTP test — is the server actually responding? ──
+        try:
+            test_resp = session.get(start_url, timeout=5)
+            log.info(f"Target reachable: {test_resp.status_code} {start_url}")
+        except requests.exceptions.ConnectionError:
+            log.error(
+                f"\n{'='*60}\n"
+                f"  CONNECTION FAILED: '{host}' resolved but not reachable\n"
+                f"  The server may be down or blocking your IP.\n"
+                f"  Try: curl -v --max-time 5 {start_url}\n"
+                f"{'='*60}"
+            )
+            return []
+        except requests.exceptions.Timeout:
+            log.error(
+                f"\n{'='*60}\n"
+                f"  TIMEOUT: '{host}' is not responding\n"
+                f"  The server may be down or overloaded.\n"
+                f"{'='*60}"
+            )
+            return []
+
+        log.info(f"Spidering {start_url}...")
 
         while queue and len(visited_urls) < max_pages:
             if time.time() - start_time > max_time:
@@ -267,7 +354,8 @@ def get_urls(
                 log.debug(f"robots.txt blocked: {current_url}")
                 continue
 
-            soup = fetch_page(current_url, session, driver, use_selenium=True)
+            soup = fetch_page(current_url, session, driver,
+                              use_selenium=(driver is not None))
             if not soup:
                 continue
 
@@ -365,7 +453,7 @@ def extract_inputs(form: Any) -> List[Dict[str, str]]:
 
 def get_input_forms(
     URL: str,
-    max_pages: int = 50,
+    max_pages: int = 30,
     respect_robots: bool = True,
 ) -> List[Dict[str, Any]]:
     """
@@ -376,10 +464,11 @@ def get_input_forms(
     Returns deduplicated list, capped at 100.
     """
     try:
-        log.info(f"{OKBLUE}{BOLD}Spidering {URL}...{ENDC}")
         urls    = get_urls(URL, max_pages=max_pages, respect_robots=respect_robots)
         session = requests.Session()
-        driver  = create_driver() if SELENIUM_AVAILABLE else None
+        session.trust_env = False   # never route through system proxy
+        session.headers.update(HEADERS)
+        driver  = None  # create_driver already ran in get_urls — don't launch Chrome twice
         results : List[Dict[str, Any]] = []
         seen_fps: Set[str] = set()
 
