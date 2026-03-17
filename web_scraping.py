@@ -453,7 +453,7 @@ def extract_inputs(form: Any) -> List[Dict[str, str]]:
 
 def get_input_forms(
     URL: str,
-    max_pages: int = 30,
+    max_pages: int = 50,
     respect_robots: bool = True,
 ) -> List[Dict[str, Any]]:
     """
