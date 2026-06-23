@@ -10,7 +10,7 @@ A professional-grade automated web application vulnerability scanner built from 
 
 | Banner & Help | Live Crawl | XSS Finding |
 |---|---|---|
-| ![Banner](screenshots/banner.png) | ![Crawl](screenshots/crawl.png) | ![Finding](screenshots/finding.png) |
+| ![Banner](images/banner.png) | ![Crawl](images/crawl.png) | ![Finding](images/finding.png) |
 
 ---
 
