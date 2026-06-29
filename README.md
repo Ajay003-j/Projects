@@ -53,24 +53,24 @@ bees/
 
 - **BFS crawling** with configurable depth and page limits
 - **SQLMap-style URL deduplication** — parameter-name fingerprinting means `/page?id=1` and `/page?id=99` are treated as the same endpoint, cutting redundant tests
-- **JS link extraction** — regex patterns pull endpoints embedded in inline JavaScript, similar to Burp Suite's passive scanner
-- **Form detection** — classifies forms by type (login, search, upload, admin) to prioritize testing
-- **robots.txt support** — respects crawl rules, avoidable with a flag
-- **Selenium fallback** — renders JS-heavy pages when Chrome is available, falls back to `requests` silently
-- **Pre-flight checks** — DNS resolution and HTTP reachability tested before crawling starts to fail fast with clear error messages
-- **Session replay protection** — skips logout/signout URLs to avoid breaking the crawl session
+- **JS link extraction** - regex patterns pull endpoints embedded in inline JavaScript, similar to Burp Suite's passive scanner
+- **Form detection** - classifies forms by type (login, search, upload, admin) to prioritize testing
+- **robots.txt support** - respects crawl rules, avoidable with a flag
+- **Selenium fallback** - renders JS-heavy pages when Chrome is available, falls back to `requests` silently
+- **Pre-flight checks** - DNS resolution and HTTP reachability tested before crawling starts to fail fast with clear error messages
+- **Session replay protection** - skips logout/signout URLs to avoid breaking the crawl session
 
 ### 🔬 Scanner Engine (`bees.py`)
 
 #### Double-Confirmation System
-When a potential vulnerability is detected, a second request with a semantically different but equivalent payload is sent to confirm. For SQL injection this means testing both a true-condition and a false-condition — a real injection returns different content for each, a false positive returns identical content.
+When a potential vulnerability is detected, a second request with a semantically different but equivalent payload is sent to confirm. For SQL injection this means testing both a true-condition and a false-condition - a real injection returns different content for each, a false positive returns identical content.
 
 #### Differential Response Analysis
-Every scan starts with a baseline request. Injected responses are compared against the baseline across five dimensions: status code, content length, word count, error count, and page title. A similarity score below 0.75 flags structural change — this is the same core technique SQLMap uses.
+Every scan starts with a baseline request. Injected responses are compared against the baseline across five dimensions: status code, content length, word count, error count, and page title. A similarity score below 0.75 flags structural change - this is the same core technique SQLMap uses.
 
 #### Two-Phase Payload Strategy
-- **Phase 1** — hardcoded built-in payloads (fast, always available)
-- **Phase 2** — loads extended payload lists from `.txt` files, skipping any already tested in Phase 1
+- **Phase 1** - hardcoded built-in payloads (fast, always available)
+- **Phase 2** - loads extended payload lists from `.txt` files, skipping any already tested in Phase 1
 - Once a vulnerability is confirmed on a parameter, remaining payloads for that parameter are skipped
 
 #### WAF Detection & Evasion
@@ -148,10 +148,10 @@ Findings are saved as both a human-readable `.txt` report and a structured `.jso
 
 ## 🧪 Tested Against
 
-- [DVWA](http://dvwa.co.uk/) — Damn Vulnerable Web Application
-- [WebGoat](https://github.com/WebGoat/WebGoat) — OWASP WebGoat
-- [zero.webappsecurity.com](http://zero.webappsecurity.com) — intentionally vulnerable demo app
-- [testphp.vulnweb.com](http://testphp.vulnweb.com) — Acunetix test target
+- [DVWA](http://dvwa.co.uk/) - Damn Vulnerable Web Application
+- [WebGoat](https://github.com/WebGoat/WebGoat) - OWASP WebGoat
+- [zero.webappsecurity.com](http://zero.webappsecurity.com) - intentionally vulnerable demo app
+- [testphp.vulnweb.com](http://testphp.vulnweb.com) - Acunetix test target
 
 > **All testing was performed on intentionally vulnerable targets in isolated lab environments.**
 
@@ -176,17 +176,16 @@ This tool was built **exclusively for educational purposes** as a final year pro
 
 ## 🛠️ Tech Stack
 
-- **Python 3** — core language
-- **requests** — HTTP client
-- **BeautifulSoup4** — HTML parsing
-- **Selenium + ChromeDriver** — JS rendering (optional)
-- **urllib3** — connection pooling and retry logic
+- **Python 3** - core language
+- **requests** - HTTP client
+- **BeautifulSoup4** - HTML parsing
+- **Selenium + ChromeDriver** - JS rendering (optional)
+- **urllib3** - connection pooling and retry logic
 
 ---
 
 ## 👤 Author
 
 **Ajay J**  
-B.E. Computer Science, DMI Engineering College, Nagercoil  
-GitHub: [github.com/Ajay003-j](https://github.com/Ajay003-j)  
+B.E. Computer Science, DMI Engineering College, Nagercoil    
 LinkedIn: [linkedin.com/in/ajay-j-5b23b62a9](https://linkedin.com/in/ajay-j-5b23b62a9)
