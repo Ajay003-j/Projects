@@ -2,7 +2,7 @@
 
 > Final Year B.E. Computer Science Project | DMI Engineering College
 
-A professional-grade automated web application vulnerability scanner built from scratch in Python. BEES combines intelligent crawling, multi-vector payload testing, WAF detection and evasion, proxy rotation, and double-confirmation logic to minimize false positives — similar to how tools like SQLMap and Burp Suite operate under the hood.
+A professional-grade automated web application vulnerability scanner built from scratch in Python. BEES combines intelligent crawling, multi-vector payload testing, WAF detection and evasion, proxy rotation, and double-confirmation logic to minimize false positives - similar to how tools like SQLMap and Burp Suite operate under the hood.
 
 ---
 
@@ -77,7 +77,7 @@ Every scan starts with a baseline request. Injected responses are compared again
 Detects Cloudflare, ModSecurity, Akamai, AWS WAF, Sucuri, Incapsula, Barracuda, and F5 BIG-IP from response headers and body. When a WAF is detected, payloads are automatically run through evasion wrappers (comment injection, URL encoding, case mixing, null bytes, IFS substitution).
 
 #### Time-Based Blind Detection
-Baseline response time is sampled across multiple requests. A sleep payload is confirmed only if elapsed time exceeds `baseline + (sleep_seconds × 0.8)` — this accounts for network jitter and avoids false positives from slow servers.
+Baseline response time is sampled across multiple requests. A sleep payload is confirmed only if elapsed time exceeds `baseline + (sleep_seconds × 0.8)` - this accounts for network jitter and avoids false positives from slow servers.
 
 ### 🔄 Proxy Rotation (`proxy.py`)
 
@@ -87,7 +87,7 @@ Fetches working elite proxies from four sources in priority order:
 3. openproxylist.net
 4. GitHub community proxy lists (fallback, always available)
 
-Every proxy is validated against `httpbin.org/ip` before use. Dead proxies are culled on startup. Scan never begins with zero proxies — your real IP is never exposed to the target.
+Every proxy is validated against `httpbin.org/ip` before use. Dead proxies are culled on startup. Scan never begins with zero proxies - your real IP is never exposed to the target.
 
 ---
 
@@ -124,7 +124,7 @@ Scan Flags:
   --full    All of the above
 
 Output Flags:
-  --live    Verbose — show every request in real time
+  --live    Verbose - show every request in real time
   --file    Save findings to results.txt + results.json
 ```
 
