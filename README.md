@@ -188,4 +188,4 @@ This tool was built **exclusively for educational purposes** as a final year pro
 
 **Ajay J**  
 B.E. Computer Science, DMI Engineering College, Nagercoil    
-LinkedIn: [linkedin.com/in/ajay-j-5b23b62a9](https://linkedin.com/in/ajay-j-5b23b62a9)
+LinkedIn: [linkedin.com/in/ajay-j-5b23b62a9](https://linkedin.com/in/ajay-j-0one)
